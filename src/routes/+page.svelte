@@ -1,12 +1,13 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
   import { gameState, currentScene, nextDialogue, selectChoice, moveToScene } from '../lib/gameState';
   import { saveGame, loadGame, autoSave, loadAutoSave, hasAutoSave } from '../lib/saveLoad';
   import { scenario } from '../lib/scenario';
   
   let showSaveMenu = false;
   let showLoadMenu = false;
-  let currentBgm = null;
+  let currentBgm: HTMLAudioElement | null = null;
   
   onMount(() => {
     // 자동 세이브 로드
@@ -20,25 +21,12 @@
     // 초기 씬 설정
     moveToScene("scene1");
     
-    // 키보드 이벤트 리스너
-    window.addEventListener('keydown', handleKeyDown);
-    
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
       if (currentBgm) {
         currentBgm.pause();
       }
     };
   });
-  
-  function handleKeyDown(event) {
-    if (event.code === 'Space') {
-      event.preventDefault();
-      if (!$gameState.isShowingChoices) {
-        nextDialogue();
-      }
-    }
-  }
   
   function handleScreenClick() {
     if (!$gameState.isShowingChoices) {
@@ -46,13 +34,13 @@
     }
   }
   
-  function handleChoice(index) {
+  function handleChoice(index: number) {
     selectChoice(index);
     showSaveMenu = false;
     showLoadMenu = false;
   }
   
-  function handleSave(slotNumber) {
+  function handleSave(slotNumber: number) {
     if (saveGame(slotNumber)) {
       alert(`슬롯 ${slotNumber}에 저장되었습니다.`);
     } else {
@@ -61,7 +49,7 @@
     showSaveMenu = false;
   }
   
-  function handleLoad(slotNumber) {
+  function handleLoad(slotNumber: number) {
     if (loadGame(slotNumber)) {
       alert(`슬롯 ${slotNumber}에서 불러왔습니다.`);
     } else {
@@ -81,14 +69,27 @@
     : [];
     
   // 배경음악 재생
-  $: if ($currentScene && $currentScene.bgm) {
-    if (currentBgm) {
-      currentBgm.pause();
+  $: if (browser) {
+    const newBgm = $currentScene?.bgm;
+    const oldBgmSrc = currentBgm?.src;
+
+    if (newBgm) {
+      const newBgmPath = `/sounds/bgm/${newBgm}`;
+      if (!oldBgmSrc || !oldBgmSrc.endsWith(newBgmPath)) {
+        if (currentBgm) {
+          currentBgm.pause();
+        }
+        currentBgm = new Audio(newBgmPath);
+        currentBgm.loop = true;
+        currentBgm.volume = 0.5;
+        currentBgm.play().catch(e => console.error('BGM play failed:', e));
+      }
+    } else {
+      if (currentBgm) {
+        currentBgm.pause();
+        currentBgm = null;
+      }
     }
-    currentBgm = new Audio(`/sounds/bgm/${$currentScene.bgm}`);
-    currentBgm.loop = true;
-    currentBgm.volume = 0.5;
-    currentBgm.play().catch(e => console.log('BGM play failed:', e));
   }
 </script>
 
@@ -99,7 +100,18 @@
 
 <main class="game-container">
   <!-- 게임 화면 -->
-  <div class="game-screen" on:click={handleScreenClick}>
+  <div 
+    class="game-screen" 
+    on:click={handleScreenClick}
+    on:keydown={(e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleScreenClick();
+      }
+    }}
+    role="button"
+    tabindex="0"
+  >
     <!-- 배경 이미지 -->
     {#if $currentScene}
       <div class="background" style="background-image: url('/images/backgrounds/{$currentScene.background}')"></div>
@@ -184,6 +196,11 @@
 </main>
 
 <style>
+  :global(body) {
+    margin: 0;
+    padding: 0;
+  }
+
   .game-container {
     position: relative;
     width: 100vw;
