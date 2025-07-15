@@ -1,0 +1,41 @@
+{
+  "id": "scene2",
+  "situations": [
+    {
+      "id": "situation1",
+      "backgroundImage": "bg_forest.png",
+      "bgm": "bgm_forest.mp3",
+      "characters": [
+        {
+          "id": "charA",
+          "name": "캐릭터A",
+          "image": "char_a.png",
+          "position": "left"
+        }
+      ],
+      "dialogue": {
+        "characterId": "charA",
+        "characterName": "캐릭터A",
+        "text": "여기는 숲 속입니다. 이곳에서 새로운 이야기가 시작됩니다."
+      }
+    },
+    {
+      "id": "situation2",
+      "backgroundImage": "bg_forest.png",
+      "bgm": "bgm_forest.mp3",
+      "characters": [
+        {
+          "id": "charA",
+          "name": "캐릭터A",
+          "image": "char_a.png",
+          "position": "center"
+        }
+      ],
+      "dialogue": {
+        "characterId": "charA",
+        "characterName": "캐릭터A",
+        "text": "여기서 새로운 모험이 시작됩니다. 다음 장으로 계속해보겠습니다."
+      }
+    }
+  ]
+}

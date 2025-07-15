@@ -1,5 +1,5 @@
 import { get } from 'svelte/store';
-import { gameState, type GameState } from './gameState';
+import { gameState, type GameState, moveToScene } from './gameState';
 
 export interface SaveData {
   gameState: GameState;
@@ -10,7 +10,7 @@ export interface SaveData {
 
 const SAVE_KEY_PREFIX = 'visual_novel_save_';
 const AUTO_SAVE_KEY = 'visual_novel_auto_save';
-const CURRENT_VERSION = '2.0'; // 새로운 구조 버전
+const CURRENT_VERSION = '3.0'; // 새로운 JSON 구조 버전
 
 export function saveGame(slotNumber: number = 1): boolean {
   try {
@@ -41,7 +41,7 @@ export function saveGame(slotNumber: number = 1): boolean {
   }
 }
 
-export function loadGame(slotNumber: number = 1): boolean {
+export async function loadGame(slotNumber: number = 1): Promise<boolean> {
   try {
     const saveData = localStorage.getItem(`${SAVE_KEY_PREFIX}${slotNumber}`);
     if (!saveData) return false;
@@ -60,7 +60,10 @@ export function loadGame(slotNumber: number = 1): boolean {
     };
     
     gameState.set(restoredState);
-    return true;
+    
+    // 씬을 비동기로 로드
+    const success = await moveToScene(restoredState.sceneId, restoredState.situationIndex);
+    return success;
   } catch (error) {
     console.error('Load failed:', error);
     return false;
@@ -88,7 +91,7 @@ export function autoSave(): boolean {
   }
 }
 
-export function loadAutoSave(): boolean {
+export async function loadAutoSave(): Promise<boolean> {
   try {
     const saveData = localStorage.getItem(AUTO_SAVE_KEY);
     if (!saveData) return false;
@@ -107,7 +110,10 @@ export function loadAutoSave(): boolean {
     };
     
     gameState.set(restoredState);
-    return true;
+    
+    // 씬을 비동기로 로드
+    const success = await moveToScene(restoredState.sceneId, restoredState.situationIndex);
+    return success;
   } catch (error) {
     console.error('Auto load failed:', error);
     return false;
