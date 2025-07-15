@@ -1,36 +1,55 @@
 import { writable } from 'svelte/store';
-import { scenario, type Scene } from './scenario';
+import { scenario, type Scene, type Situation, type Dialogue } from './scenario';
 
 export interface GameState {
-  currentSceneId: string;
-  currentDialogueIndex: number;
+  sceneId: string;
+  situationIndex: number;
+  dialogueIndex: number;
   isShowingChoices: boolean;
   autoSave: boolean;
   playedScenes: Set<string>;
 }
 
 export const gameState = writable<GameState>({
-  currentSceneId: "scene1",
-  currentDialogueIndex: 0,
+  sceneId: "scene1",
+  situationIndex: 0,
+  dialogueIndex: 0,
   isShowingChoices: false,
   autoSave: true,
   playedScenes: new Set<string>()
 });
 
 export const currentScene = writable<Scene | null>(null);
+export const currentSituation = writable<Situation | null>(null);
 
 export function getCurrentScene(): Scene | null {
-  return scenario.find(scene => {
-    let state: GameState;
-    gameState.subscribe(value => state = value)();
-    return scene.id === state.currentSceneId;
-  }) || null;
+  let state: GameState;
+  gameState.subscribe(value => state = value)();
+  return scenario.find(scene => scene.id === state.sceneId) || null;
 }
 
-export function moveToScene(sceneId: string): void {
+export function getCurrentSituation(): Situation | null {
+  const scene = getCurrentScene();
+  if (!scene) return null;
+  
+  let state: GameState;
+  gameState.subscribe(value => state = value)();
+  
+  return scene.situations[state.situationIndex] || null;
+}
+
+export function getCurrentDialogue(): Dialogue | null {
+  const situation = getCurrentSituation();
+  if (!situation) return null;
+  
+  return situation.dialogue;
+}
+
+export function moveToScene(sceneId: string, situationIndex: number = 0): void {
   gameState.update(state => {
-    state.currentSceneId = sceneId;
-    state.currentDialogueIndex = 0;
+    state.sceneId = sceneId;
+    state.situationIndex = situationIndex;
+    state.dialogueIndex = 0;
     state.isShowingChoices = false;
     state.playedScenes.add(sceneId);
     return state;
@@ -39,33 +58,116 @@ export function moveToScene(sceneId: string): void {
   const scene = scenario.find(s => s.id === sceneId);
   if (scene) {
     currentScene.set(scene);
+    const situation = scene.situations[situationIndex];
+    if (situation) {
+      currentSituation.set(situation);
+      // 선택지가 있는 경우 바로 표시
+      if (situation.dialogue.choices && situation.dialogue.choices.length > 0) {
+        gameState.update(state => {
+          state.isShowingChoices = true;
+          return state;
+        });
+      }
+    }
+  }
+}
+
+export function moveToSituation(situationIndex: number): void {
+  gameState.update(state => {
+    state.situationIndex = situationIndex;
+    state.dialogueIndex = 0;
+    state.isShowingChoices = false;
+    return state;
+  });
+  
+  const situation = getCurrentSituation();
+  if (situation) {
+    currentSituation.set(situation);
+    // 선택지가 있는 경우 바로 표시
+    if (situation.dialogue.choices && situation.dialogue.choices.length > 0) {
+      gameState.update(state => {
+        state.isShowingChoices = true;
+        return state;
+      });
+    }
+  }
+}
+
+export function nextSituation(): void {
+  const scene = getCurrentScene();
+  if (!scene) return;
+  
+  gameState.update(state => {
+    if (state.situationIndex < scene.situations.length - 1) {
+      state.situationIndex++;
+      state.dialogueIndex = 0;
+      state.isShowingChoices = false;
+    }
+    return state;
+  });
+  
+  const situation = getCurrentSituation();
+  if (situation) {
+    currentSituation.set(situation);
+    // 선택지가 있는 경우 바로 표시
+    if (situation.dialogue.choices && situation.dialogue.choices.length > 0) {
+      gameState.update(state => {
+        state.isShowingChoices = true;
+        return state;
+      });
+    }
   }
 }
 
 export function nextDialogue(): void {
+  const situation = getCurrentSituation();
+  if (!situation) return;
+  
   gameState.update(state => {
-    const scene = getCurrentScene();
-    if (!scene) return state;
-    
-    if (state.currentDialogueIndex < scene.dialogues.length - 1) {
-      state.currentDialogueIndex++;
+    // 선택지가 있는 경우 바로 표시
+    if (situation.dialogue.choices && situation.dialogue.choices.length > 0) {
+      state.isShowingChoices = true;
     } else {
-      // 대사가 끝나면 선택지 표시
-      if (scene.choices && scene.choices.length > 0) {
-        state.isShowingChoices = true;
+      // 선택지가 없는 경우 자동으로 다음 상황으로 이동
+      const scene = getCurrentScene();
+      if (scene && state.situationIndex < scene.situations.length - 1) {
+        state.situationIndex++;
+        state.dialogueIndex = 0;
+        state.isShowingChoices = false;
       }
     }
-    
     return state;
   });
+  
+  // 상황이 변경된 경우 다시 설정
+  const newSituation = getCurrentSituation();
+  if (newSituation) {
+    currentSituation.set(newSituation);
+    // 새로운 상황에 선택지가 있는 경우 바로 표시
+    if (newSituation.dialogue.choices && newSituation.dialogue.choices.length > 0) {
+      gameState.update(state => {
+        state.isShowingChoices = true;
+        return state;
+      });
+    }
+  }
 }
 
 export function selectChoice(choiceIndex: number): void {
-  const scene = getCurrentScene();
-  if (!scene || !scene.choices || choiceIndex >= scene.choices.length) return;
+  const situation = getCurrentSituation();
+  if (!situation || !situation.dialogue.choices || choiceIndex >= situation.dialogue.choices.length) {
+    return;
+  }
   
-  const choice = scene.choices[choiceIndex];
-  moveToScene(choice.nextScene);
+  const choice = situation.dialogue.choices[choiceIndex];
+  const event = choice.event;
+  
+  if (event === "next_situation") {
+    nextSituation();
+  } else if (event.startsWith("next_scene_")) {
+    const targetSceneId = event.replace("next_scene_", "");
+    moveToScene(targetSceneId);
+  }
   
   // 자동 세이브
   gameState.subscribe(state => {
@@ -77,17 +179,15 @@ export function selectChoice(choiceIndex: number): void {
 
 export function resetGame(): void {
   gameState.set({
-    currentSceneId: "scene1",
-    currentDialogueIndex: 0,
+    sceneId: "scene1",
+    situationIndex: 0,
+    dialogueIndex: 0,
     isShowingChoices: false,
     autoSave: true,
     playedScenes: new Set<string>()
   });
   
-  const scene = scenario.find(s => s.id === "scene1");
-  if (scene) {
-    currentScene.set(scene);
-  }
+  moveToScene("scene1");
 }
 
 // 초기 씬 설정
