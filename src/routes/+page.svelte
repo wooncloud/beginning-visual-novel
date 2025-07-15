@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
-  import { gameState, currentScene, nextDialogue, selectChoice, moveToScene } from '../lib/gameState';
+  import { gameState, currentScene, currentSituation, nextDialogue, selectChoice, moveToScene } from '../lib/gameState';
   import { saveGame, loadGame, autoSave, loadAutoSave, hasAutoSave } from '../lib/saveLoad';
   import { scenario } from '../lib/scenario';
   
@@ -58,19 +58,22 @@
     showLoadMenu = false;
   }
   
-  // 현재 씬의 대화 가져오기
-  $: currentDialogue = $currentScene && $gameState.currentDialogueIndex < $currentScene.dialogues.length 
-    ? $currentScene.dialogues[$gameState.currentDialogueIndex] 
-    : null;
+  // 현재 상황의 대화 가져오기
+  $: currentDialogue = $currentSituation ? $currentSituation.dialogue : null;
     
-  // 현재 씬의 선택지 가져오기
-  $: currentChoices = $currentScene && $gameState.isShowingChoices 
-    ? $currentScene.choices || [] 
+  // 현재 상황의 선택지 가져오기
+  $: currentChoices = $currentSituation && $gameState.isShowingChoices 
+    ? $currentSituation.dialogue.choices || [] 
     : [];
+    
+  // 캐릭터 이미지 위치별 분류
+  $: leftCharacters = $currentSituation ? $currentSituation.characters.filter(c => c.position === 'left') : [];
+  $: centerCharacters = $currentSituation ? $currentSituation.characters.filter(c => c.position === 'center') : [];
+  $: rightCharacters = $currentSituation ? $currentSituation.characters.filter(c => c.position === 'right') : [];
     
   // 배경음악 재생
   $: if (browser) {
-    const newBgm = $currentScene?.bgm;
+    const newBgm = $currentSituation?.bgm;
     const oldBgmSrc = currentBgm?.src;
 
     if (newBgm) {
@@ -113,15 +116,38 @@
     tabindex="0"
   >
     <!-- 배경 이미지 -->
-    {#if $currentScene}
-      <div class="background" style="background-image: url('/images/backgrounds/{$currentScene.background}')"></div>
+    {#if $currentSituation}
+      <div class="background" style="background-image: url('/images/backgrounds/{$currentSituation.backgroundImage}')"></div>
     {/if}
     
-    <!-- 캐릭터 이미지 -->
-    {#if $currentScene}
-      <div class="character">
-        <img src="/images/characters/{$currentScene.character}" alt="Character" />
-      </div>
+    <!-- 캐릭터 이미지들 -->
+    {#if $currentSituation}
+      <!-- 왼쪽 캐릭터들 -->
+      {#each leftCharacters as character}
+        {#if character.image}
+          <div class="character left-character">
+            <img src="/images/characters/{character.image}" alt={character.name} />
+          </div>
+        {/if}
+      {/each}
+      
+      <!-- 중앙 캐릭터들 -->
+      {#each centerCharacters as character}
+        {#if character.image}
+          <div class="character center-character">
+            <img src="/images/characters/{character.image}" alt={character.name} />
+          </div>
+        {/if}
+      {/each}
+      
+      <!-- 오른쪽 캐릭터들 -->
+      {#each rightCharacters as character}
+        {#if character.image}
+          <div class="character right-character">
+            <img src="/images/characters/{character.image}" alt={character.name} />
+          </div>
+        {/if}
+      {/each}
     {/if}
     
     <!-- 선택지 -->
@@ -152,9 +178,11 @@
   <!-- 대화 박스 -->
   {#if currentDialogue}
     <div class="dialogue-box">
-      <div class="character-name">{currentDialogue.name}</div>
+      <div class="character-name">{currentDialogue.characterName}</div>
       <div class="dialogue-text">{currentDialogue.text}</div>
-      <div class="continue-hint">▼ 클릭하거나 스페이스키를 누르세요</div>
+      {#if !$gameState.isShowingChoices}
+        <div class="continue-hint">▼ 클릭하거나 스페이스키를 누르세요</div>
+      {/if}
     </div>
   {/if}
   
@@ -231,15 +259,28 @@
   .character {
     position: absolute;
     bottom: 20%;
-    left: 50%;
-    transform: translateX(-50%);
     z-index: 2;
   }
   
   .character img {
     max-height: 60vh;
-    max-width: 40vw;
+    max-width: 30vw;
     object-fit: contain;
+  }
+  
+  .left-character {
+    left: 10%;
+    transform: translateX(-50%);
+  }
+  
+  .center-character {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  
+  .right-character {
+    right: 10%;
+    transform: translateX(50%);
   }
   
   .choices-container {

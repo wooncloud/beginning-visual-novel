@@ -5,10 +5,12 @@ export interface SaveData {
   gameState: GameState;
   timestamp: number;
   saveSlot: number;
+  version: string; // 버전 정보 추가
 }
 
 const SAVE_KEY_PREFIX = 'visual_novel_save_';
 const AUTO_SAVE_KEY = 'visual_novel_auto_save';
+const CURRENT_VERSION = '2.0'; // 새로운 구조 버전
 
 export function saveGame(slotNumber: number = 1): boolean {
   try {
@@ -19,7 +21,8 @@ export function saveGame(slotNumber: number = 1): boolean {
         playedScenes: new Set(currentState.playedScenes) // Set을 배열로 변환
       },
       timestamp: Date.now(),
-      saveSlot: slotNumber
+      saveSlot: slotNumber,
+      version: CURRENT_VERSION
     };
     
     const serializedData = JSON.stringify({
@@ -44,6 +47,13 @@ export function loadGame(slotNumber: number = 1): boolean {
     if (!saveData) return false;
     
     const parsedData = JSON.parse(saveData);
+    
+    // 구버전 데이터인 경우 무시
+    if (!parsedData.version || parsedData.version !== CURRENT_VERSION) {
+      console.warn('Incompatible save data version, ignoring old save');
+      return false;
+    }
+    
     const restoredState: GameState = {
       ...parsedData.gameState,
       playedScenes: new Set(parsedData.gameState.playedScenes)
@@ -66,7 +76,8 @@ export function autoSave(): boolean {
         playedScenes: Array.from(currentState.playedScenes)
       },
       timestamp: Date.now(),
-      saveSlot: 'auto'
+      saveSlot: 'auto',
+      version: CURRENT_VERSION
     };
     
     localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(saveData));
@@ -83,6 +94,13 @@ export function loadAutoSave(): boolean {
     if (!saveData) return false;
     
     const parsedData = JSON.parse(saveData);
+    
+    // 구버전 데이터인 경우 무시
+    if (!parsedData.version || parsedData.version !== CURRENT_VERSION) {
+      console.warn('Incompatible auto save data version, ignoring old save');
+      return false;
+    }
+    
     const restoredState: GameState = {
       ...parsedData.gameState,
       playedScenes: new Set(parsedData.gameState.playedScenes)
@@ -104,7 +122,11 @@ export function getSaveSlots(): SaveData[] {
     if (saveData) {
       try {
         const parsedData = JSON.parse(saveData);
-        saves.push(parsedData);
+        
+        // 구버전 데이터는 제외
+        if (parsedData.version && parsedData.version === CURRENT_VERSION) {
+          saves.push(parsedData);
+        }
       } catch (error) {
         console.error(`Error parsing save slot ${i}:`, error);
       }
@@ -125,5 +147,15 @@ export function deleteSave(slotNumber: number): boolean {
 }
 
 export function hasAutoSave(): boolean {
-  return localStorage.getItem(AUTO_SAVE_KEY) !== null;
+  try {
+    const saveData = localStorage.getItem(AUTO_SAVE_KEY);
+    if (!saveData) return false;
+    
+    const parsedData = JSON.parse(saveData);
+    // 구버전 데이터인 경우 false 반환
+    return parsedData.version && parsedData.version === CURRENT_VERSION;
+  } catch (error) {
+    console.error('Check auto save failed:', error);
+    return false;
+  }
 }
