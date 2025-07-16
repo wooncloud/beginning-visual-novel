@@ -1,0 +1,41 @@
+{
+  "id": "scene3",
+  "situations": [
+    {
+      "id": "situation1",
+      "backgroundImage": "bg_mountain.png",
+      "bgm": "bgm_mountain.mp3",
+      "characters": [
+        {
+          "id": "charB",
+          "name": "캐릭터B",
+          "image": "char_b.png",
+          "position": "right"
+        }
+      ],
+      "dialogue": {
+        "characterId": "charB",
+        "characterName": "캐릭터B",
+        "text": "마지막 장에 오신 것을 환영합니다. 여기는 산길입니다."
+      }
+    },
+    {
+      "id": "situation2",
+      "backgroundImage": "bg_mountain.png",
+      "bgm": "bgm_mountain.mp3",
+      "characters": [
+        {
+          "id": "charB",
+          "name": "캐릭터B",
+          "image": "char_b.png",
+          "position": "center"
+        }
+      ],
+      "dialogue": {
+        "characterId": "charB",
+        "characterName": "캐릭터B",
+        "text": "게임이 완료되었습니다! 감사합니다."
+      }
+    }
+  ]
+}

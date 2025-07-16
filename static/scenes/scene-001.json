@@ -1,0 +1,47 @@
+{
+  "id": "scene1",
+  "situations": [
+    {
+      "id": "situation1",
+      "backgroundImage": "bg_placeholder.png",
+      "bgm": "bgm_placeholder.mp3",
+      "characters": [
+        {
+          "id": "charA",
+          "name": "캐릭터A",
+          "image": "char_a.png",
+          "position": "left"
+        },
+        {
+          "id": "charB",
+          "name": "캐릭터B",
+          "image": "char_b.png",
+          "position": "right"
+        }
+      ],
+      "dialogue": {
+        "characterId": "charA",
+        "characterName": "캐릭터A",
+        "text": "환영합니다! 비주얼 노벨의 시작입니다."
+      }
+    },
+    {
+      "id": "situation2",
+      "backgroundImage": "bg_placeholder.png",
+      "bgm": "bgm_placeholder.mp3",
+      "characters": [
+        {
+          "id": "charB",
+          "name": "캐릭터B",
+          "image": "char_b.png",
+          "position": "center"
+        }
+      ],
+      "dialogue": {
+        "characterId": "charB",
+        "characterName": "캐릭터B",
+        "text": "좋은 선택입니다. 이제 다음 장으로 넘어갑니다."
+      }
+    }
+  ]
+}

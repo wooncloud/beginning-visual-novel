@@ -3,23 +3,25 @@
   import { browser } from '$app/environment';
   import { gameState, currentScene, currentSituation, nextDialogue, selectChoice, moveToScene } from '../lib/gameState';
   import { saveGame, loadGame, autoSave, loadAutoSave, hasAutoSave } from '../lib/saveLoad';
-  import { scenario } from '../lib/scenario';
   
   let showSaveMenu = false;
   let showLoadMenu = false;
   let currentBgm: HTMLAudioElement | null = null;
   
-  onMount(() => {
+  onMount(async () => {
     // 자동 세이브 로드
     if (hasAutoSave()) {
       const shouldLoad = confirm('자동 저장된 데이터를 불러오시겠습니까?');
       if (shouldLoad) {
-        loadAutoSave();
+        await loadAutoSave();
+      } else {
+        // 초기 씬 설정
+        await moveToScene("scene1");
       }
+    } else {
+      // 초기 씬 설정
+      await moveToScene("scene1");
     }
-    
-    // 초기 씬 설정
-    moveToScene("scene1");
     
     return () => {
       if (currentBgm) {
@@ -28,14 +30,14 @@
     };
   });
   
-  function handleScreenClick() {
-    if (!$gameState.isShowingChoices) {
-      nextDialogue();
+  async function handleScreenClick() {
+    if (!$gameState.isShowingChoices && !$gameState.isLoading) {
+      await nextDialogue();
     }
   }
   
-  function handleChoice(index: number) {
-    selectChoice(index);
+  async function handleChoice(index: number) {
+    await selectChoice(index);
     showSaveMenu = false;
     showLoadMenu = false;
   }
@@ -49,8 +51,9 @@
     showSaveMenu = false;
   }
   
-  function handleLoad(slotNumber: number) {
-    if (loadGame(slotNumber)) {
+  async function handleLoad(slotNumber: number) {
+    const success = await loadGame(slotNumber);
+    if (success) {
       alert(`슬롯 ${slotNumber}에서 불러왔습니다.`);
     } else {
       alert('불러오기에 실패했습니다.');
@@ -98,150 +101,287 @@
 
 <svelte:head>
   <title>Visual Novel Game</title>
-  <meta name="description" content="SvelteKit + Capacitor Visual Novel Game" />
 </svelte:head>
 
-<main class="game-container">
-  <!-- 게임 화면 -->
-  <div 
-    class="game-screen" 
-    on:click={handleScreenClick}
-    on:keydown={(e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        handleScreenClick();
-      }
-    }}
-    role="button"
-    tabindex="0"
-  >
-    <!-- 배경 이미지 -->
-    {#if $currentSituation}
-      <div class="background" style="background-image: url('/images/backgrounds/{$currentSituation.backgroundImage}')"></div>
-    {/if}
-    
-    <!-- 캐릭터 이미지들 -->
-    {#if $currentSituation}
-      <!-- 왼쪽 캐릭터들 -->
-      {#each leftCharacters as character}
-        {#if character.image}
-          <div class="character left-character">
-            <img src="/images/characters/{character.image}" alt={character.name} />
-          </div>
-        {/if}
-      {/each}
-      
-      <!-- 중앙 캐릭터들 -->
-      {#each centerCharacters as character}
-        {#if character.image}
-          <div class="character center-character">
-            <img src="/images/characters/{character.image}" alt={character.name} />
-          </div>
-        {/if}
-      {/each}
-      
-      <!-- 오른쪽 캐릭터들 -->
-      {#each rightCharacters as character}
-        {#if character.image}
-          <div class="character right-character">
-            <img src="/images/characters/{character.image}" alt={character.name} />
-          </div>
-        {/if}
-      {/each}
-    {/if}
-    
-    <!-- 선택지 -->
-    {#if currentChoices.length > 0}
-      <div class="choices-container">
-        {#each currentChoices as choice, index}
-          <button 
-            class="choice-button" 
-            on:click|stopPropagation={() => handleChoice(index)}
-          >
-            {choice.text}
-          </button>
-        {/each}
+<!-- 로딩 화면 -->
+{#if $gameState.isLoading}
+  <div class="loading-screen">
+    <div class="loading-spinner"></div>
+    <p>씬을 불러오는 중...</p>
+  </div>
+{/if}
+
+<!-- 오류 화면 -->
+{#if $gameState.error}
+  <div class="error-screen">
+    <h2>오류가 발생했습니다</h2>
+    <p>{$gameState.error}</p>
+    <button on:click={async () => await moveToScene("scene1")}>
+      처음으로 돌아가기
+    </button>
+  </div>
+{/if}
+
+<!-- 메인 게임 화면 -->
+{#if !$gameState.isLoading && !$gameState.error && $currentSituation}
+  <div class="game-container" on:click={handleScreenClick}>
+    <!-- 게임 UI -->
+    <div class="ui-container">
+      <!-- 메뉴 버튼들 -->
+      <div class="menu-buttons">
+        <button on:click|stopPropagation={() => showSaveMenu = !showSaveMenu}>
+          저장
+        </button>
+        <button on:click|stopPropagation={() => showLoadMenu = !showLoadMenu}>
+          불러오기
+        </button>
       </div>
-    {/if}
-  </div>
-  
-  <!-- UI 컨트롤 -->
-  <div class="ui-controls">
-    <button class="control-btn" on:click={() => showSaveMenu = !showSaveMenu}>
-      저장하기
-    </button>
-    <button class="control-btn" on:click={() => showLoadMenu = !showLoadMenu}>
-      불러오기
-    </button>
-  </div>
-  
-  <!-- 대화 박스 -->
-  {#if currentDialogue}
-    <div class="dialogue-box">
-      <div class="character-name">{currentDialogue.characterName}</div>
-      <div class="dialogue-text">{currentDialogue.text}</div>
-      {#if !$gameState.isShowingChoices}
-        <div class="continue-hint">▼ 클릭하거나 스페이스키를 누르세요</div>
+      
+      <!-- 저장 메뉴 -->
+      {#if showSaveMenu}
+        <div class="save-menu" on:click|stopPropagation>
+          <h3>저장하기</h3>
+          {#each Array(5) as _, i}
+            <button on:click={() => handleSave(i + 1)}>
+              슬롯 {i + 1}
+            </button>
+          {/each}
+          <button on:click={() => showSaveMenu = false}>닫기</button>
+        </div>
+      {/if}
+      
+      <!-- 불러오기 메뉴 -->
+      {#if showLoadMenu}
+        <div class="load-menu" on:click|stopPropagation>
+          <h3>불러오기</h3>
+          {#each Array(5) as _, i}
+            <button on:click={() => handleLoad(i + 1)}>
+              슬롯 {i + 1}
+            </button>
+          {/each}
+          <button on:click={() => showLoadMenu = false}>닫기</button>
+        </div>
       {/if}
     </div>
-  {/if}
-  
-  <!-- 저장 메뉴 -->
-  {#if showSaveMenu}
-    <div class="save-menu">
-      <h3>저장하기</h3>
-      <div class="save-slots">
-        {#each Array(5) as _, i}
-          <button 
-            class="save-slot" 
-            on:click={() => handleSave(i + 1)}
-          >
-            슬롯 {i + 1}
-          </button>
-        {/each}
-      </div>
-      <button class="close-btn" on:click={() => showSaveMenu = false}>닫기</button>
+    
+    <!-- 배경 이미지 -->
+    <div class="background" style="background-image: url('/images/bg/{$currentSituation.backgroundImage}')">
     </div>
-  {/if}
-  
-  <!-- 로드 메뉴 -->
-  {#if showLoadMenu}
-    <div class="load-menu">
-      <h3>불러오기</h3>
-      <div class="save-slots">
-        {#each Array(5) as _, i}
-          <button 
-            class="save-slot" 
-            on:click={() => handleLoad(i + 1)}
-          >
-            슬롯 {i + 1}
-          </button>
-        {/each}
-      </div>
-      <button class="close-btn" on:click={() => showLoadMenu = false}>닫기</button>
+    
+    <!-- 캐릭터 이미지들 -->
+    <div class="characters">
+      <!-- 왼쪽 캐릭터 -->
+      {#if leftCharacters.length > 0}
+        <div class="character-group left">
+          {#each leftCharacters as character}
+            <div class="character">
+              <img 
+                src="/images/characters/{character.image}" 
+                alt={character.name}
+                class="character-image"
+              />
+            </div>
+          {/each}
+        </div>
+      {/if}
+      
+      <!-- 가운데 캐릭터 -->
+      {#if centerCharacters.length > 0}
+        <div class="character-group center">
+          {#each centerCharacters as character}
+            <div class="character">
+              <img 
+                src="/images/characters/{character.image}" 
+                alt={character.name}
+                class="character-image"
+              />
+            </div>
+          {/each}
+        </div>
+      {/if}
+      
+      <!-- 오른쪽 캐릭터 -->
+      {#if rightCharacters.length > 0}
+        <div class="character-group right">
+          {#each rightCharacters as character}
+            <div class="character">
+              <img 
+                src="/images/characters/{character.image}" 
+                alt={character.name}
+                class="character-image"
+              />
+            </div>
+          {/each}
+        </div>
+      {/if}
     </div>
-  {/if}
-</main>
+    
+    <!-- 대화 박스 -->
+    <div class="dialogue-box">
+      <div class="speaker-name">{currentDialogue?.characterName}</div>
+      <div class="dialogue-text">{currentDialogue?.text}</div>
+      
+      <!-- 선택지 표시 -->
+      {#if currentChoices.length > 0}
+        <div class="choices">
+          {#each currentChoices as choice, index}
+            <button 
+              class="choice-button"
+              on:click|stopPropagation={() => handleChoice(index)}
+            >
+              {choice.text}
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  </div>
+{/if}
 
 <style>
-  :global(body) {
-    margin: 0;
-    padding: 0;
+  /* 로딩 화면 스타일 */
+  .loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 18px;
+    z-index: 1000;
   }
-
+  
+  .loading-spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3498db;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  /* 오류 화면 스타일 */
+  .error-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    text-align: center;
+    z-index: 1000;
+  }
+  
+  .error-screen h2 {
+    color: #ff6b6b;
+    margin-bottom: 20px;
+  }
+  
+  .error-screen button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+  }
+  
+  .error-screen button:hover {
+    background: #2980b9;
+  }
+  
+  /* 기존 스타일들 */
   .game-container {
     position: relative;
     width: 100vw;
     height: 100vh;
     overflow: hidden;
-    font-family: 'Noto Sans KR', sans-serif;
+    cursor: pointer;
   }
   
-  .game-screen {
-    position: relative;
+  .ui-container {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
+    z-index: 100;
+    pointer-events: none;
+  }
+  
+  .menu-buttons {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    gap: 10px;
+    pointer-events: auto;
+  }
+  
+  .menu-buttons button {
+    padding: 10px 20px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    border-radius: 5px;
     cursor: pointer;
+    font-size: 14px;
+  }
+  
+  .menu-buttons button:hover {
+    background: rgba(0, 0, 0, 0.9);
+  }
+  
+  .save-menu, .load-menu {
+    position: absolute;
+    top: 60px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 200px;
+    pointer-events: auto;
+  }
+  
+  .save-menu h3, .load-menu h3 {
+    margin: 0 0 10px 0;
+    text-align: center;
+    color: #3498db;
+  }
+  
+  .save-menu button, .load-menu button {
+    padding: 8px 16px;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  
+  .save-menu button:hover, .load-menu button:hover {
+    background: #2980b9;
   }
   
   .background {
@@ -252,172 +392,100 @@
     height: 100%;
     background-size: cover;
     background-position: center;
-    background-repeat: no-repeat;
-    background-color: #2c2c2c;
+    z-index: 1;
+  }
+  
+  .characters {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+  }
+  
+  .character-group {
+    position: absolute;
+    height: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  
+  .character-group.left {
+    left: 10%;
+    width: 30%;
+  }
+  
+  .character-group.center {
+    left: 35%;
+    width: 30%;
+  }
+  
+  .character-group.right {
+    left: 60%;
+    width: 30%;
   }
   
   .character {
-    position: absolute;
-    bottom: 20%;
-    z-index: 2;
+    position: relative;
+    max-height: 80%;
+    display: flex;
+    align-items: flex-end;
   }
   
-  .character img {
-    max-height: 60vh;
-    max-width: 30vw;
+  .character-image {
+    max-width: 100%;
+    max-height: 100%;
     object-fit: contain;
-  }
-  
-  .left-character {
-    left: 10%;
-    transform: translateX(-50%);
-  }
-  
-  .center-character {
-    left: 50%;
-    transform: translateX(-50%);
-  }
-  
-  .right-character {
-    right: 10%;
-    transform: translateX(50%);
-  }
-  
-  .choices-container {
-    position: absolute;
-    bottom: 25%;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 10;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  
-  .choice-button {
-    padding: 15px 30px;
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    border: 2px solid #ffffff;
-    border-radius: 10px;
-    cursor: pointer;
-    font-size: 16px;
-    transition: all 0.3s ease;
-  }
-  
-  .choice-button:hover {
-    background: rgba(255, 255, 255, 0.2);
-    transform: translateY(-2px);
-  }
-  
-  .ui-controls {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    z-index: 20;
-    display: flex;
-    gap: 10px;
-  }
-  
-  .control-btn {
-    padding: 10px 20px;
-    background: rgba(0, 0, 0, 0.7);
-    color: white;
-    border: 1px solid #ffffff;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: background 0.3s ease;
-  }
-  
-  .control-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
   }
   
   .dialogue-box {
     position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
     background: rgba(0, 0, 0, 0.8);
     color: white;
     padding: 20px;
+    border-radius: 10px;
     z-index: 10;
-    border-top: 2px solid #ffffff;
+    pointer-events: auto;
   }
   
-  .character-name {
-    font-size: 18px;
+  .speaker-name {
     font-weight: bold;
-    color: #ffcc00;
+    color: #3498db;
     margin-bottom: 10px;
+    font-size: 16px;
   }
   
   .dialogue-text {
-    font-size: 16px;
     line-height: 1.6;
-    margin-bottom: 10px;
+    font-size: 18px;
+    margin-bottom: 15px;
   }
   
-  .continue-hint {
-    font-size: 12px;
-    color: #cccccc;
-    text-align: right;
-    opacity: 0.7;
-  }
-  
-  .save-menu, .load-menu {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0, 0, 0, 0.9);
-    color: white;
-    padding: 30px;
-    border-radius: 10px;
-    border: 2px solid #ffffff;
-    z-index: 30;
-    min-width: 300px;
-  }
-  
-  .save-menu h3, .load-menu h3 {
-    margin: 0 0 20px 0;
-    text-align: center;
-  }
-  
-  .save-slots {
+  .choices {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    margin-bottom: 20px;
+    margin-top: 15px;
   }
   
-  .save-slot {
-    padding: 10px 20px;
-    background: rgba(255, 255, 255, 0.1);
+  .choice-button {
+    padding: 10px 15px;
+    background: #3498db;
     color: white;
-    border: 1px solid #ffffff;
+    border: none;
     border-radius: 5px;
     cursor: pointer;
-    transition: background 0.3s ease;
+    font-size: 16px;
+    text-align: left;
   }
   
-  .save-slot:hover {
-    background: rgba(255, 255, 255, 0.2);
-  }
-  
-  .close-btn {
-    width: 100%;
-    padding: 10px;
-    background: rgba(255, 0, 0, 0.7);
-    color: white;
-    border: 1px solid #ffffff;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background 0.3s ease;
-  }
-  
-  .close-btn:hover {
-    background: rgba(255, 0, 0, 0.9);
+  .choice-button:hover {
+    background: #2980b9;
   }
 </style>
