@@ -1,7 +1,10 @@
 import { writable } from 'svelte/store';
 import { loadScene, getNextSceneId, checkSceneExists, type Scene, type Situation, type Dialogue } from './scenario';
 
+export type GameMode = 'main' | 'game';
+
 export interface GameState {
+  gameMode: GameMode;
   sceneId: string;
   situationIndex: number;
   dialogueIndex: number;
@@ -13,6 +16,7 @@ export interface GameState {
 }
 
 export const gameState = writable<GameState>({
+  gameMode: 'main',
   sceneId: "scene1",
   situationIndex: 0,
   dialogueIndex: 0,
@@ -201,6 +205,20 @@ export async function resetGame(): Promise<void> {
   });
   
   await moveToScene("scene1");
+}
+
+export function showMainMenu(): void {
+  gameState.update(state => {
+    state.gameMode = 'main';
+    return state;
+  });
+}
+
+export function startGame(): void {
+  gameState.update(state => {
+    state.gameMode = 'game';
+    return state;
+  });
 }
 
 // 초기 씬 설정은 컴포넌트에서 수행
