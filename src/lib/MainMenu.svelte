@@ -2,6 +2,7 @@
   import { createEventDispatcher } from 'svelte';
   import { getSaveSlots, loadGame, type SaveData } from './saveLoad';
   import { resetGame, startGame } from './gameState';
+  import Options from './Options.svelte';
   
   const dispatch = createEventDispatcher();
   
@@ -103,13 +104,7 @@
   
   <!-- 옵션 팝업 -->
   {#if showOptions}
-    <div class="popup-overlay" on:click={closeOptions}>
-      <div class="popup-content" on:click|stopPropagation>
-        <h2>옵션</h2>
-        <p class="placeholder-text">옵션 설정은 추후 구현 예정입니다.</p>
-        <button class="close-button" on:click={closeOptions}>닫기</button>
-      </div>
-    </div>
+    <Options on:close={closeOptions} />
   {/if}
 </div>
 
@@ -288,12 +283,7 @@
     background: #c0392b;
   }
   
-  .placeholder-text {
-    text-align: center;
-    color: #bbb;
-    margin: 2rem 0;
-    font-style: italic;
-  }
+
   
   /* 모바일 대응 */
   @media (max-width: 768px) {

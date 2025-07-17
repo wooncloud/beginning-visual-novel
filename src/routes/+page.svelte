@@ -1,13 +1,19 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
-  import { gameState, currentScene, currentSituation, nextDialogue, selectChoice, moveToScene, resetGame, startGame, showMainMenu } from '../lib/gameState';
+  import { gameState, currentScene, currentSituation, nextDialogue, selectChoice, moveToScene, resetGame, startGame, showMainMenu, getCurrentDialogue } from '../lib/gameState';
   import { saveGame, loadGame, autoSave, loadAutoSave, hasAutoSave } from '../lib/saveLoad';
+  import { optionsState, applyBgmVolume, applySfxVolume, getTextSpeedMs } from '../lib/optionsState';
   import MainMenu from '../lib/MainMenu.svelte';
+  import Options from '../lib/Options.svelte';
   
   let showSaveMenu = false;
   let showLoadMenu = false;
+  let showOptionsMenu = false;
   let currentBgm: HTMLAudioElement | null = null;
+  let displayedText = '';
+  let isTextAnimating = false;
+  let textAnimationInterval: number | null = null;
   
   onMount(async () => {
     // 메인화면에서 시작 - 자동 저장된 데이터가 있어도 메인화면 먼저 표시
@@ -15,19 +21,78 @@
       if (currentBgm) {
         currentBgm.pause();
       }
+      if (textAnimationInterval) {
+        clearInterval(textAnimationInterval);
+      }
     };
   });
   
   async function handleScreenClick() {
-    if (!$gameState.isShowingChoices && !$gameState.isLoading) {
+    if (isTextAnimating) {
+      // 텍스트 애니메이션 중이면 즉시 완성
+      completeTextAnimation();
+    } else if (!$gameState.isShowingChoices && !$gameState.isLoading) {
       await nextDialogue();
     }
   }
+
+  function startTextAnimation(text: string) {
+    if (!browser) return;
+    
+    if (textAnimationInterval) {
+      clearInterval(textAnimationInterval);
+    }
+    
+    displayedText = '';
+    isTextAnimating = true;
+    
+    const speed = getTextSpeedMs($optionsState.textSpeed);
+    const charDelay = Math.max(20, speed / text.length);
+    let charIndex = 0;
+    
+    textAnimationInterval = setInterval(() => {
+      if (charIndex < text.length) {
+        displayedText = text.substring(0, charIndex + 1);
+        charIndex++;
+      } else {
+        completeTextAnimation();
+      }
+    }, charDelay) as unknown as number;
+  }
+  
+  function completeTextAnimation() {
+    if (textAnimationInterval) {
+      clearInterval(textAnimationInterval);
+      textAnimationInterval = null;
+    }
+    
+    const dialogue = getCurrentDialogue();
+    if (dialogue) {
+      displayedText = dialogue.text;
+    }
+    isTextAnimating = false;
+  }
   
   async function handleChoice(index: number) {
+    // 선택 효과음 재생
+    playSfx('click.mp3');
+    
     await selectChoice(index);
     showSaveMenu = false;
     showLoadMenu = false;
+    showOptionsMenu = false;
+  }
+
+  function playSfx(filename: string) {
+    if (!browser) return;
+    
+    try {
+      const audio = new Audio(`/sounds/sfx/${filename}`);
+      applySfxVolume(audio, $optionsState.sfxVolume);
+      audio.play().catch(e => console.log('SFX play failed:', e));
+    } catch (error) {
+      console.log('SFX error:', error);
+    }
   }
   
   function handleSave(slotNumber: number) {
@@ -96,7 +161,7 @@
         }
         currentBgm = new Audio(newBgmPath);
         currentBgm.loop = true;
-        currentBgm.volume = 0.5;
+        applyBgmVolume(currentBgm, $optionsState.bgmVolume);
         currentBgm.play().catch(e => console.error('BGM play failed:', e));
       }
     } else {
@@ -105,6 +170,16 @@
         currentBgm = null;
       }
     }
+  }
+
+  // BGM 볼륨 실시간 적용
+  $: if (currentBgm && $optionsState) {
+    applyBgmVolume(currentBgm, $optionsState.bgmVolume);
+  }
+
+  // 텍스트 애니메이션 시작
+  $: if (currentDialogue && currentDialogue.text) {
+    startTextAnimation(currentDialogue.text);
   }
 </script>
 
@@ -153,6 +228,9 @@
           <button on:click|stopPropagation={() => showLoadMenu = !showLoadMenu}>
             불러오기
           </button>
+          <button on:click|stopPropagation={() => showOptionsMenu = !showOptionsMenu}>
+            옵션
+          </button>
           <button on:click|stopPropagation={() => {
             if (confirm('메인 메뉴로 돌아가시겠습니까?')) {
               showMainMenu();
@@ -186,6 +264,11 @@
             {/each}
             <button on:click={() => showLoadMenu = false}>닫기</button>
           </div>
+        {/if}
+        
+        <!-- 옵션 메뉴 -->
+        {#if showOptionsMenu}
+          <Options on:close={() => showOptionsMenu = false} />
         {/if}
       </div>
       
@@ -244,7 +327,7 @@
       <!-- 대화 박스 -->
       <div class="dialogue-box">
         <div class="speaker-name">{currentDialogue?.characterName}</div>
-        <div class="dialogue-text">{currentDialogue?.text}</div>
+        <div class="dialogue-text">{displayedText}</div>
         
         <!-- 선택지 표시 -->
         {#if currentChoices.length > 0}
