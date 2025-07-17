@@ -1,0 +1,181 @@
+.main-menu {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: 1;
+}
+
+.menu-container {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  margin-top: 20vh; /* 화면 중간보다 약간 아래 배치 */
+}
+
+.game-title {
+  color: var(--text-primary);
+  font-size: 3rem;
+  margin-bottom: 3rem;
+  text-shadow: var(--text-shadow-default);
+  font-weight: bold;
+}
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+}
+
+.menu-button {
+  width: 200px;
+  padding: 12px 24px;
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--text-primary);
+  background: var(--bg-button);
+  border: 2px solid var(--border-light);
+  border-radius: var(--border-radius-default);
+  cursor: pointer;
+  transition: var(--transition-default);
+  backdrop-filter: blur(5px);
+}
+
+.menu-button:hover {
+  background: var(--bg-button-hover);
+  border-color: rgba(255, 255, 255, 0.6);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-default);
+}
+
+.menu-button:active {
+  transform: translateY(0);
+}
+
+/* Save slot styles */
+.no-saves {
+  text-align: center;
+  color: var(--text-secondary);
+  font-style: italic;
+  margin: 2rem 0;
+}
+
+.save-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.save-slot {
+  background: rgba(52, 152, 219, 0.2);
+  border: 1px solid var(--border-accent);
+  color: var(--text-primary);
+  padding: 1rem;
+  border-radius: var(--border-radius-default);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  text-align: left;
+}
+
+.save-slot:hover {
+  background: rgba(52, 152, 219, 0.4);
+  border-color: var(--border-accent-hover);
+}
+
+.slot-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.slot-number {
+  font-weight: bold;
+  color: var(--text-accent);
+}
+
+.slot-date {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.slot-details {
+  font-size: 0.9rem;
+  color: #ddd;
+}
+
+.scene-info {
+  color: var(--text-muted);
+}
+
+.close-button {
+  width: 100%;
+  padding: 0.8rem;
+  background: var(--danger-color);
+  color: var(--text-primary);
+  border: none;
+  border-radius: var(--border-radius-default);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: var(--transition-fast);
+}
+
+.close-button:hover {
+  background: var(--danger-color-hover);
+}
+
+.placeholder-text {
+  text-align: center;
+  color: var(--text-secondary);
+  margin: 2rem 0;
+  font-style: italic;
+}
+
+/* 모바일 대응 */
+@media (max-width: 768px) {
+  .game-title {
+    font-size: 2rem;
+    margin-bottom: 2rem;
+  }
+  
+  .menu-button {
+    width: 180px;
+    font-size: 16px;
+  }
+  
+  .menu-container {
+    margin-top: 15vh;
+  }
+}
+
+@media (max-width: 480px) {
+  .game-title {
+    font-size: 1.5rem;
+  }
+  
+  .menu-button {
+    width: 160px;
+    font-size: 14px;
+    padding: 10px 20px;
+  }
+  
+  .menu-container {
+    margin-top: 10vh;
+  }
+}
