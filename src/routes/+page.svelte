@@ -1,27 +1,77 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
-  import { gameState, currentScene, currentSituation, nextDialogue, selectChoice, moveToScene, resetGame, startGame, showMainMenu } from '../lib/gameState';
+  import { gameState, currentScene, currentSituation, nextDialogue, selectChoice, moveToScene, resetGame, startGame, showMainMenu, setTypingState, onTypingComplete, canAdvanceDialogue, clearAutoAdvanceTimer } from '../lib/gameState';
   import { saveGame, loadGame, autoSave, loadAutoSave, hasAutoSave } from '../lib/saveLoad';
+  import { gameSettings } from '../lib/settings';
   import MainMenu from '../lib/MainMenu.svelte';
+  import TypewriterEffect from '../lib/TypewriterEffect.svelte';
+  import SettingsMenu from '../lib/SettingsMenu.svelte';
   
   let showSaveMenu = false;
   let showLoadMenu = false;
+  let showSettingsMenu = false;
   let currentBgm: HTMLAudioElement | null = null;
+  let typewriterComponent: TypewriterEffect;
+  
+  function handleKeydown(event: KeyboardEvent) {
+    if ($gameState.gameMode !== 'game') return;
+    
+    if (event.code === 'Space' || event.code === 'Enter') {
+      event.preventDefault();
+      handleScreenClick();
+    }
+  }
+  
+  function handleTouchEnd(event: TouchEvent) {
+    if ($gameState.gameMode !== 'game') return;
+    
+    event.preventDefault();
+    handleScreenClick();
+  }
   
   onMount(async () => {
+    // 설정 로드
+    gameSettings.load();
+    
+    // 키보드 이벤트 리스너 추가
+    document.addEventListener('keydown', handleKeydown);
+    
     // 메인화면에서 시작 - 자동 저장된 데이터가 있어도 메인화면 먼저 표시
     return () => {
       if (currentBgm) {
         currentBgm.pause();
       }
+      document.removeEventListener('keydown', handleKeydown);
     };
   });
   
   async function handleScreenClick() {
-    if (!$gameState.isShowingChoices && !$gameState.isLoading) {
+    // 자동 진행 타이머 정리 (사용자가 수동으로 진행)
+    clearAutoAdvanceTimer();
+    
+    // 타이핑 중이면 타이핑을 완료시킴
+    if ($gameState.isTyping && typewriterComponent) {
+      typewriterComponent.skip();
+      return;
+    }
+    
+    // 진행 가능한 상태일 때만 다음 대사로 이동
+    if (canAdvanceDialogue()) {
       await nextDialogue();
     }
+  }
+  
+  function handleTypingStart() {
+    setTypingState(true);
+  }
+  
+  function handleTypingComplete() {
+    onTypingComplete();
+  }
+  
+  function handleTypingSkip() {
+    onTypingComplete();
   }
   
   async function handleChoice(index: number) {
@@ -142,7 +192,7 @@
 
   <!-- 메인 게임 화면 -->
   {#if !$gameState.isLoading && !$gameState.error && $currentSituation}
-    <div class="game-container" on:click={handleScreenClick}>
+    <div class="game-container" on:click={handleScreenClick} on:touchend={handleTouchEnd}>
       <!-- 게임 UI -->
       <div class="ui-container">
         <!-- 메뉴 버튼들 -->
@@ -152,6 +202,9 @@
           </button>
           <button on:click|stopPropagation={() => showLoadMenu = !showLoadMenu}>
             불러오기
+          </button>
+          <button on:click|stopPropagation={() => showSettingsMenu = !showSettingsMenu}>
+            설정
           </button>
           <button on:click|stopPropagation={() => {
             if (confirm('메인 메뉴로 돌아가시겠습니까?')) {
@@ -186,6 +239,11 @@
             {/each}
             <button on:click={() => showLoadMenu = false}>닫기</button>
           </div>
+        {/if}
+        
+        <!-- 설정 메뉴 -->
+        {#if showSettingsMenu}
+          <SettingsMenu on:close={() => showSettingsMenu = false} />
         {/if}
       </div>
       
@@ -244,7 +302,22 @@
       <!-- 대화 박스 -->
       <div class="dialogue-box">
         <div class="speaker-name">{currentDialogue?.characterName}</div>
-        <div class="dialogue-text">{currentDialogue?.text}</div>
+        <div class="dialogue-text">
+          {#if currentDialogue?.text && $gameSettings.enableTypingEffect}
+            <TypewriterEffect 
+              bind:this={typewriterComponent}
+              text={currentDialogue.text}
+              speed={$gameSettings.typingSpeed}
+              autoStart={true}
+              skipOnClick={false}
+              on:start={handleTypingStart}
+              on:complete={handleTypingComplete}
+              on:skip={handleTypingSkip}
+            />
+          {:else if currentDialogue?.text}
+            {currentDialogue.text}
+          {/if}
+        </div>
         
         <!-- 선택지 표시 -->
         {#if currentChoices.length > 0}
@@ -257,6 +330,12 @@
                 {choice.text}
               </button>
             {/each}
+          </div>
+        {:else if $gameState.canAdvance && !$gameState.isTyping}
+          <!-- 진행 가능 인디케이터 -->
+          <div class="advance-indicator">
+            <span class="advance-text">클릭하여 계속</span>
+            <span class="advance-icon">▼</span>
           </div>
         {/if}
       </div>
@@ -513,5 +592,75 @@
   
   .choice-button:hover {
     background: #2980b9;
+  }
+  
+  /* 진행 인디케이터 스타일 */
+  .advance-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    margin-top: 15px;
+    opacity: 0.7;
+    font-size: 14px;
+    color: #bbb;
+  }
+  
+  .advance-text {
+    margin-right: 8px;
+  }
+  
+  .advance-icon {
+    animation: bounce 2s infinite;
+    font-size: 16px;
+  }
+  
+  @keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+      transform: translateY(0);
+    }
+    40% {
+      transform: translateY(-5px);
+    }
+    60% {
+      transform: translateY(-3px);
+    }
+  }
+  
+  /* 모바일 대응 개선 */
+  @media (max-width: 768px) {
+    .dialogue-text {
+      font-size: 16px;
+    }
+    
+    .advance-indicator {
+      font-size: 12px;
+    }
+    
+    .advance-text {
+      display: none; /* 모바일에서는 텍스트 숨김 */
+    }
+    
+    .menu-buttons button {
+      padding: 8px 16px;
+      font-size: 14px;
+    }
+  }
+  
+  /* 터치 디바이스를 위한 개선 */
+  @media (hover: none) and (pointer: coarse) {
+    .game-container {
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    .choice-button {
+      padding: 15px;
+      font-size: 18px;
+      margin-bottom: 12px;
+    }
+    
+    .choice-button:active {
+      background: #2980b9;
+      transform: scale(0.98);
+    }
   }
 </style>

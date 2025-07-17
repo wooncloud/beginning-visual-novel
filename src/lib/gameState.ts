@@ -13,6 +13,9 @@ export interface GameState {
   playedScenes: Set<string>;
   isLoading: boolean;
   error: string | null;
+  isTyping: boolean;
+  canAdvance: boolean;
+  autoAdvanceTimer: number | null;
 }
 
 export const gameState = writable<GameState>({
@@ -24,7 +27,10 @@ export const gameState = writable<GameState>({
   autoSave: true,
   playedScenes: new Set<string>(),
   isLoading: false,
-  error: null
+  error: null,
+  isTyping: false,
+  canAdvance: false,
+  autoAdvanceTimer: null
 });
 
 export const currentScene = writable<Scene | null>(null);
@@ -147,14 +153,95 @@ export async function nextSituation(): Promise<boolean> {
   }
 }
 
+// 타이핑 상태 관리 함수들
+export function setTypingState(isTyping: boolean): void {
+  gameState.update(state => ({
+    ...state,
+    isTyping,
+    canAdvance: !isTyping
+  }));
+}
+
+export function onTypingComplete(): void {
+  gameState.update(state => ({
+    ...state,
+    isTyping: false,
+    canAdvance: true
+  }));
+  
+  // 타이핑 완료 후 자동 진행 시작
+  startAutoAdvanceTimer();
+}
+
+// 자동 진행 타이머 시작
+function startAutoAdvanceTimer(): void {
+  // 설정에서 자동 진행이 활성화되어 있는지 확인
+  import('./settings').then(({ gameSettings }) => {
+    gameSettings.subscribe(settings => {
+      if (settings.autoAdvance) {
+        let state: GameState;
+        gameState.subscribe(value => state = value)();
+        
+        // 이미 타이머가 실행 중이거나 선택지가 있으면 시작하지 않음
+        if (state.autoAdvanceTimer || state.isShowingChoices) return;
+        
+        const timerId = window.setTimeout(async () => {
+          // 현재 상태 재확인
+          gameState.subscribe(value => state = value)();
+          if (state.canAdvance && !state.isShowingChoices && !state.isTyping) {
+            await nextDialogue();
+          }
+          clearAutoAdvanceTimer();
+        }, settings.autoAdvanceDelay);
+        
+        gameState.update(state => ({
+          ...state,
+          autoAdvanceTimer: timerId
+        }));
+      }
+    })();
+  });
+}
+
+// 자동 진행 타이머 정리
+export function clearAutoAdvanceTimer(): void {
+  gameState.update(state => {
+    if (state.autoAdvanceTimer) {
+      clearTimeout(state.autoAdvanceTimer);
+    }
+    return {
+      ...state,
+      autoAdvanceTimer: null
+    };
+  });
+}
+
+export function canAdvanceDialogue(): boolean {
+  let state: GameState;
+  gameState.subscribe(value => state = value)();
+  return state.canAdvance && !state.isShowingChoices && !state.isLoading;
+}
+
 export async function nextDialogue(): Promise<void> {
   const situation = getCurrentSituation();
   if (!situation) return;
+  
+  // 타이핑 중이면 진행하지 않음
+  let state: GameState;
+  gameState.subscribe(value => state = value)();
+  
+  if (state.isTyping) return;
+  
+  // 자동 진행 타이머 정리
+  clearAutoAdvanceTimer();
   
   gameState.update(state => {
     // 선택지가 있는 경우 바로 표시
     if (situation.dialogue.choices && situation.dialogue.choices.length > 0) {
       state.isShowingChoices = true;
+      state.canAdvance = false;
+    } else {
+      state.canAdvance = false;
     }
     return state;
   });
