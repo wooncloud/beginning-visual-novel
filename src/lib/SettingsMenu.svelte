@@ -43,29 +43,26 @@
   <div class="settings-modal" on:click|stopPropagation>
     <div class="settings-header">
       <h2>게임 설정</h2>
-      <button class="close-button" on:click={handleCancel}>×</button>
     </div>
     
     <div class="settings-content">
       <!-- 타이핑 효과 설정 -->
       <div class="setting-group">
-        <h3>텍스트 표시</h3>
-        
-        <div class="setting-item">
-          <label>
+        <div class="setting-item toggle">
+          <label for="typing-effect-toggle">타이핑 효과</label>
+          <div class="toggle-switch">
             <input 
               type="checkbox" 
+              id="typing-effect-toggle"
               bind:checked={settings.enableTypingEffect}
             />
-            타이핑 효과 사용
-          </label>
+            <span class="switch"></span>
+          </div>
         </div>
         
         {#if settings.enableTypingEffect}
-          <div class="setting-item">
-            <label for="typing-speed">
-              타이핑 속도: {getTypingSpeedLabel(settings.typingSpeed)}
-            </label>
+          <div class="setting-item slider">
+            <label for="typing-speed">타이핑 속도</label>
             <input 
               id="typing-speed"
               type="range" 
@@ -73,35 +70,29 @@
               max="100" 
               step="10"
               bind:value={settings.typingSpeed}
-              class="slider"
             />
-            <div class="slider-labels">
-              <span>빠름</span>
-              <span>느림</span>
-            </div>
+            <span>{getTypingSpeedLabel(settings.typingSpeed)}</span>
           </div>
         {/if}
       </div>
       
       <!-- 자동 진행 설정 -->
       <div class="setting-group">
-        <h3>자동 진행</h3>
-        
-        <div class="setting-item">
-          <label>
+        <div class="setting-item toggle">
+          <label for="auto-advance-toggle">자동 진행</label>
+          <div class="toggle-switch">
             <input 
               type="checkbox" 
+              id="auto-advance-toggle"
               bind:checked={settings.autoAdvance}
             />
-            자동 진행 사용
-          </label>
+            <span class="switch"></span>
+          </div>
         </div>
         
         {#if settings.autoAdvance}
-          <div class="setting-item">
-            <label for="auto-delay">
-              자동 진행 속도: {settings.autoAdvanceDelay / 1000}초
-            </label>
+          <div class="setting-item slider">
+            <label for="auto-delay">자동 진행 속도</label>
             <input 
               id="auto-delay"
               type="range" 
@@ -109,58 +100,46 @@
               max="5000" 
               step="500"
               bind:value={settings.autoAdvanceDelay}
-              class="slider"
             />
-            <div class="slider-labels">
-              <span>빠름</span>
-              <span>느림</span>
-            </div>
+            <span>{settings.autoAdvanceDelay / 1000}초</span>
           </div>
         {/if}
       </div>
       
       <!-- 음향 설정 -->
       <div class="setting-group">
-        <h3>음향</h3>
-        
-        <div class="setting-item">
-          <label for="bgm-volume">
-            배경음 볼륨: {Math.round(settings.bgmVolume * 100)}%
-          </label>
+        <div class="setting-item slider">
+          <label for="bgm-volume">배경음 볼륨</label>
           <input 
             id="bgm-volume"
             type="range" 
             min="0" 
             max="1" 
-            step="0.1"
+            step="0.05"
             bind:value={settings.bgmVolume}
-            class="slider"
           />
+          <span>{Math.round(settings.bgmVolume * 100)}%</span>
         </div>
         
-        <div class="setting-item">
-          <label for="sfx-volume">
-            효과음 볼륨: {Math.round(settings.sfxVolume * 100)}%
-          </label>
+        <div class="setting-item slider">
+          <label for="sfx-volume">효과음 볼륨</label>
           <input 
             id="sfx-volume"
             type="range" 
             min="0" 
             max="1" 
-            step="0.1"
+            step="0.05"
             bind:value={settings.sfxVolume}
-            class="slider"
           />
+          <span>{Math.round(settings.sfxVolume * 100)}%</span>
         </div>
       </div>
     </div>
     
     <div class="settings-footer">
-      <button class="reset-button" on:click={handleReset}>초기화</button>
-      <div class="button-group">
-        <button class="cancel-button" on:click={handleCancel}>취소</button>
-        <button class="save-button" on:click={handleSave}>저장</button>
-      </div>
+      <button class="btn-secondary" on:click={handleReset}>초기화</button>
+      <button class="btn-primary" on:click={handleSave}>확인</button>
+      <button class="btn-secondary" on:click={handleCancel}>닫기</button>
     </div>
   </div>
 </div>
@@ -172,206 +151,186 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.7);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 1000;
+    backdrop-filter: blur(2px);
   }
   
   .settings-modal {
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-    max-width: 500px;
+    background: #2c2c2c;
+    color: white;
+    border-radius: 10px;
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.5);
     width: 90%;
-    max-height: 80vh;
-    overflow-y: auto;
+    max-width: 400px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
   }
   
   .settings-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px 24px;
-    border-bottom: 1px solid #e0e0e0;
+    text-align: center;
+    margin-bottom: 25px;
   }
   
   .settings-header h2 {
     margin: 0;
-    color: #333;
     font-size: 24px;
-  }
-  
-  .close-button {
-    background: none;
-    border: none;
-    font-size: 32px;
-    color: #666;
-    cursor: pointer;
-    padding: 0;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    transition: all 0.2s;
-  }
-  
-  .close-button:hover {
-    background: #f0f0f0;
-    color: #333;
-  }
-  
-  .settings-content {
-    padding: 24px;
-  }
-  
-  .setting-group {
-    margin-bottom: 32px;
-  }
-  
-  .setting-group:last-child {
-    margin-bottom: 0;
-  }
-  
-  .setting-group h3 {
-    margin: 0 0 16px 0;
-    color: #333;
-    font-size: 18px;
     font-weight: 600;
   }
   
-  .setting-item {
-    margin-bottom: 16px;
+  .settings-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
   }
   
+  .setting-group {
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .setting-group:last-of-type {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+  
+  .setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+  }
   .setting-item:last-child {
     margin-bottom: 0;
   }
   
   .setting-item label {
-    display: block;
-    color: #555;
-    font-weight: 500;
-    margin-bottom: 8px;
+    font-size: 16px;
   }
   
-  .setting-item input[type="checkbox"] {
-    margin-right: 8px;
-    transform: scale(1.2);
+  .setting-item.slider {
+    display: grid;
+    grid-template-columns: 1fr 2fr 0.5fr;
+    gap: 15px;
   }
   
-  .slider {
+  .slider span {
+    text-align: right;
+    min-width: 50px;
+  }
+
+  .toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 28px;
+  }
+  
+  .toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  
+  .switch {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #555;
+    transition: .4s;
+    border-radius: 28px;
+  }
+  
+  .switch:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+  }
+  
+  input:checked + .switch {
+    background-color: #3498db;
+  }
+  
+  input:checked + .switch:before {
+    transform: translateX(22px);
+  }
+  
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
     width: 100%;
-    height: 6px;
-    border-radius: 3px;
-    background: #ddd;
+    height: 8px;
+    background: #555;
+    border-radius: 5px;
     outline: none;
-    margin: 8px 0;
-    -webkit-appearance: none;
-    appearance: none;
+    opacity: 0.7;
+    transition: opacity .2s;
   }
   
-  .slider::-webkit-slider-thumb {
+  input[type="range"]:hover {
+    opacity: 1;
+  }
+  
+  input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
     width: 20px;
     height: 20px;
+    background: #3498db;
     border-radius: 50%;
-    background: #4CAF50;
     cursor: pointer;
+    border: 2px solid white;
   }
   
-  .slider::-moz-range-thumb {
+  input[type="range"]::-moz-range-thumb {
     width: 20px;
     height: 20px;
+    background: #3498db;
     border-radius: 50%;
-    background: #4CAF50;
     cursor: pointer;
-    border: none;
-  }
-  
-  .slider-labels {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    color: #666;
-    margin-top: 4px;
+    border: 2px solid white;
   }
   
   .settings-footer {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    padding: 20px 24px;
-    border-top: 1px solid #e0e0e0;
-    background: #f9f9f9;
-    border-radius: 0 0 12px 12px;
+    margin-top: 30px;
   }
   
-  .button-group {
-    display: flex;
-    gap: 12px;
-  }
-  
-  .settings-footer button {
+  .btn-primary, .btn-secondary {
     padding: 10px 20px;
     border: none;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 500;
+    border-radius: 5px;
     cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
     transition: all 0.2s;
   }
   
-  .reset-button {
-    background: #f44336;
+  .btn-primary {
+    background: #3498db;
     color: white;
   }
-  
-  .reset-button:hover {
-    background: #d32f2f;
+  .btn-primary:hover {
+    background: #2980b9;
   }
   
-  .cancel-button {
+  .btn-secondary {
     background: #6c757d;
     color: white;
   }
-  
-  .cancel-button:hover {
+  .btn-secondary:hover {
     background: #5a6268;
-  }
-  
-  .save-button {
-    background: #007bff;
-    color: white;
-  }
-  
-  .save-button:hover {
-    background: #0056b3;
-  }
-  
-  /* 모바일 대응 */
-  @media (max-width: 600px) {
-    .settings-modal {
-      width: 95%;
-      max-height: 90vh;
-    }
-    
-    .settings-header,
-    .settings-content,
-    .settings-footer {
-      padding: 16px;
-    }
-    
-    .settings-header h2 {
-      font-size: 20px;
-    }
-    
-    .setting-group h3 {
-      font-size: 16px;
-    }
   }
 </style>
