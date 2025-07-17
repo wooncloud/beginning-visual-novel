@@ -1,0 +1,244 @@
+/* Loading and Error screens */
+.loading-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-overlay-dark);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: var(--text-primary);
+  font-size: 18px;
+  z-index: 1000;
+}
+
+.error-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: var(--text-primary);
+  text-align: center;
+  z-index: 1000;
+}
+
+.error-screen h2 {
+  color: #ff6b6b;
+  margin-bottom: 20px;
+}
+
+.error-screen button {
+  margin-top: 20px;
+  padding: 10px 20px;
+  background: var(--primary-color);
+  color: var(--text-primary);
+  border: none;
+  border-radius: var(--border-radius-small);
+  cursor: pointer;
+  font-size: 16px;
+  transition: var(--transition-fast);
+}
+
+.error-screen button:hover {
+  background: var(--primary-color-hover);
+}
+
+/* Game container and main UI */
+.game-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.ui-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.menu-buttons {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.menu-buttons button {
+  padding: 10px 20px;
+  background: var(--bg-button);
+  color: var(--text-primary);
+  border: none;
+  border-radius: var(--border-radius-small);
+  cursor: pointer;
+  font-size: 14px;
+  transition: var(--transition-fast);
+}
+
+.menu-buttons button:hover {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+/* Save and Load menus */
+.save-menu, 
+.load-menu {
+  position: absolute;
+  top: 60px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.9);
+  color: var(--text-primary);
+  padding: 20px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 200px;
+  pointer-events: auto;
+}
+
+.save-menu h3, 
+.load-menu h3 {
+  margin: 0 0 10px 0;
+  text-align: center;
+  color: var(--text-accent);
+}
+
+.save-menu button, 
+.load-menu button {
+  padding: 8px 16px;
+  background: var(--primary-color);
+  color: var(--text-primary);
+  border: none;
+  border-radius: var(--border-radius-small);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.save-menu button:hover, 
+.load-menu button:hover {
+  background: var(--primary-color-hover);
+}
+
+/* Game background and characters */
+.background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  z-index: 1;
+}
+
+.characters {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.character-group {
+  position: absolute;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.character-group.left {
+  left: 10%;
+  width: 30%;
+}
+
+.character-group.center {
+  left: 35%;
+  width: 30%;
+}
+
+.character-group.right {
+  left: 60%;
+  width: 30%;
+}
+
+.character {
+  position: relative;
+  max-height: 80%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.character-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* Dialogue system */
+.dialogue-box {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  background: var(--bg-overlay-dark);
+  color: var(--text-primary);
+  padding: 20px;
+  border-radius: 10px;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.speaker-name {
+  font-weight: bold;
+  color: var(--text-accent);
+  margin-bottom: 10px;
+  font-size: 16px;
+}
+
+.dialogue-text {
+  line-height: 1.6;
+  font-size: 18px;
+  margin-bottom: 15px;
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.choice-button {
+  padding: 10px 15px;
+  background: var(--primary-color);
+  color: var(--text-primary);
+  border: none;
+  border-radius: var(--border-radius-small);
+  cursor: pointer;
+  font-size: 16px;
+  text-align: left;
+  transition: var(--transition-fast);
+}
+
+.choice-button:hover {
+  background: var(--primary-color-hover);
+}
