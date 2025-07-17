@@ -1,76 +1,74 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
-  import { gameState, currentScene, currentSituation, nextDialogue, selectChoice, moveToScene, resetGame, startGame, showMainMenu, getCurrentDialogue } from '../lib/gameState';
+  import { gameState, currentScene, currentSituation, nextDialogue, selectChoice, moveToScene, resetGame, startGame, showMainMenu, setTypingState, onTypingComplete, canAdvanceDialogue, clearAutoAdvanceTimer } from '../lib/gameState';
   import { saveGame, loadGame, autoSave, loadAutoSave, hasAutoSave } from '../lib/saveLoad';
-  import { optionsState, applyBgmVolume, applySfxVolume, getTextSpeedMs } from '../lib/optionsState';
+  import { gameSettings } from '../lib/settings';
   import MainMenu from '../lib/MainMenu.svelte';
-  import Options from '../lib/Options.svelte';
+  import TypewriterEffect from '../lib/TypewriterEffect.svelte';
+  import SettingsMenu from '../lib/SettingsMenu.svelte';
   import '../styles/components/Game.css';
+  import { applyBgmVolume, applySfxVolume, optionsState } from '../lib/optionsState';
   
   let showSaveMenu = false;
   let showLoadMenu = false;
-  let showOptionsMenu = false;
+  let showSettingsMenu = false;
   let currentBgm: HTMLAudioElement | null = null;
-  let displayedText = '';
-  let isTextAnimating = false;
-  let textAnimationInterval: number | null = null;
+  let typewriterComponent: TypewriterEffect;
+  
+  function handleKeydown(event: KeyboardEvent) {
+    if ($gameState.gameMode !== 'game') return;
+    
+    if (event.code === 'Space' || event.code === 'Enter') {
+      event.preventDefault();
+      handleScreenClick();
+    }
+  }
+  
+  function handleTouchEnd(event: TouchEvent) {
+    if ($gameState.gameMode !== 'game') return;
+    
+    event.preventDefault();
+    handleScreenClick();
+  }
   
   onMount(() => {
+    gameSettings.load();
+    document.addEventListener('keydown', handleKeydown);
     return () => {
       if (currentBgm) {
         currentBgm.pause();
       }
-      if (textAnimationInterval) {
-        clearInterval(textAnimationInterval);
-      }
+      document.removeEventListener('keydown', handleKeydown);
     };
   });
   
   async function handleScreenClick() {
-    if (isTextAnimating) {
-      // 텍스트 애니메이션 중이면 즉시 완성
-      completeTextAnimation();
-    } else if (!$gameState.isShowingChoices && !$gameState.isLoading) {
+    // 자동 진행 타이머 정리 (사용자가 수동으로 진행)
+    clearAutoAdvanceTimer();
+    
+    // 타이핑 중이면 타이핑을 완료시킴
+    if ($gameState.isTyping && typewriterComponent) {
+      typewriterComponent.skip();
+      return;
+    }
+    
+    // 진행 가능한 상태일 때만 다음 대사로 이동
+    if (canAdvanceDialogue()) {
       await nextDialogue();
     }
   }
 
-  function startTextAnimation(text: string) {
-    if (!browser) return;
-    
-    if (textAnimationInterval) {
-      clearInterval(textAnimationInterval);
-    }
-    
-    displayedText = '';
-    isTextAnimating = true;
-    
-    const speed = getTextSpeedMs($optionsState.textSpeed);
-    const charDelay = Math.max(20, speed / text.length);
-    let charIndex = 0;
-    
-    textAnimationInterval = setInterval(() => {
-      if (charIndex < text.length) {
-        displayedText = text.substring(0, charIndex + 1);
-        charIndex++;
-      } else {
-        completeTextAnimation();
-      }
-    }, charDelay) as unknown as number;
+  function handleTypingStart() {
+    setTypingState(true);
   }
   
-  function completeTextAnimation() {
-    if (textAnimationInterval) {
-      clearInterval(textAnimationInterval);
-      textAnimationInterval = null;
-    }
-    
-    const dialogue = getCurrentDialogue();
-    if (dialogue) {
-      displayedText = dialogue.text;
-    }
-    isTextAnimating = false;
+  function handleTypingComplete() {
+    onTypingComplete();
+  }
+  
+  function handleTypingSkip() {
+    onTypingComplete();
   }
   
   async function handleChoice(index: number) {
@@ -80,7 +78,7 @@
     await selectChoice(index);
     showSaveMenu = false;
     showLoadMenu = false;
-    showOptionsMenu = false;
+    showSettingsMenu = false;
   }
 
   function playSfx(filename: string) {
@@ -179,7 +177,7 @@
 
   // 텍스트 애니메이션 시작
   $: if (currentDialogue && currentDialogue.text) {
-    startTextAnimation(currentDialogue.text);
+    // startTextAnimation(currentDialogue.text); // 미사용 코드 제거
   }
 </script>
 
@@ -217,7 +215,7 @@
 
   <!-- 메인 게임 화면 -->
   {#if !$gameState.isLoading && !$gameState.error && $currentSituation}
-    <div class="game-container" on:click={handleScreenClick}>
+    <div class="game-container" on:click={handleScreenClick} on:touchend={handleTouchEnd}>
       <!-- 게임 UI -->
       <div class="ui-container">
         <!-- 메뉴 버튼들 -->
@@ -228,8 +226,8 @@
           <button on:click|stopPropagation={() => showLoadMenu = !showLoadMenu}>
             불러오기
           </button>
-          <button on:click|stopPropagation={() => showOptionsMenu = !showOptionsMenu}>
-            옵션
+          <button on:click|stopPropagation={() => showSettingsMenu = !showSettingsMenu}>
+            설정
           </button>
           <button on:click|stopPropagation={() => {
             if (confirm('메인 메뉴로 돌아가시겠습니까?')) {
@@ -266,9 +264,9 @@
           </div>
         {/if}
         
-        <!-- 옵션 메뉴 -->
-        {#if showOptionsMenu}
-          <Options on:close={() => showOptionsMenu = false} />
+        <!-- 설정 메뉴 -->
+        {#if showSettingsMenu}
+          <SettingsMenu on:close={() => showSettingsMenu = false} />
         {/if}
       </div>
       
@@ -327,7 +325,22 @@
       <!-- 대화 박스 -->
       <div class="dialogue-box">
         <div class="speaker-name">{currentDialogue?.characterName}</div>
-        <div class="dialogue-text">{displayedText}</div>
+        <div class="dialogue-text">
+          {#if currentDialogue?.text && $gameSettings.enableTypingEffect}
+            <TypewriterEffect 
+              bind:this={typewriterComponent}
+              text={currentDialogue.text}
+              speed={$gameSettings.typingSpeed}
+              autoStart={true}
+              skipOnClick={false}
+              on:start={handleTypingStart}
+              on:complete={handleTypingComplete}
+              on:skip={handleTypingSkip}
+            />
+          {:else if currentDialogue?.text}
+            {currentDialogue.text}
+          {/if}
+        </div>
         
         <!-- 선택지 표시 -->
         {#if currentChoices.length > 0}
@@ -341,9 +354,336 @@
               </button>
             {/each}
           </div>
+        {:else if $gameState.canAdvance && !$gameState.isTyping}
+          <!-- 진행 가능 인디케이터 -->
+          <div class="advance-indicator">
+            <span class="advance-text">클릭하여 계속</span>
+            <span class="advance-icon">▼</span>
+          </div>
         {/if}
       </div>
     </div>
   {/if}
 {/if}
 
+<style>
+  /* 로딩 화면 스타일 */
+  .loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 18px;
+    z-index: 1000;
+  }
+  
+  .loading-spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3498db;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  /* 오류 화면 스타일 */
+  .error-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    text-align: center;
+    z-index: 1000;
+  }
+  
+  .error-screen h2 {
+    color: #ff6b6b;
+    margin-bottom: 20px;
+  }
+  
+  .error-screen button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+  }
+  
+  .error-screen button:hover {
+    background: #2980b9;
+  }
+  
+  /* 기존 스타일들 */
+  .game-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  
+  .ui-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 100;
+    pointer-events: none;
+  }
+  
+  .menu-buttons {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    gap: 10px;
+    pointer-events: auto;
+  }
+  
+  .menu-buttons button {
+    padding: 10px 20px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  
+  .menu-buttons button:hover {
+    background: rgba(0, 0, 0, 0.9);
+  }
+  
+  .save-menu, .load-menu {
+    position: absolute;
+    top: 60px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 200px;
+    pointer-events: auto;
+  }
+  
+  .save-menu h3, .load-menu h3 {
+    margin: 0 0 10px 0;
+    text-align: center;
+    color: #3498db;
+  }
+  
+  .save-menu button, .load-menu button {
+    padding: 8px 16px;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  
+  .save-menu button:hover, .load-menu button:hover {
+    background: #2980b9;
+  }
+  
+  .background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    z-index: 1;
+  }
+  
+  .characters {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+  }
+  
+  .character-group {
+    position: absolute;
+    height: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  
+  .character-group.left {
+    left: 10%;
+    width: 30%;
+  }
+  
+  .character-group.center {
+    left: 35%;
+    width: 30%;
+  }
+  
+  .character-group.right {
+    left: 60%;
+    width: 30%;
+  }
+  
+  .character {
+    position: relative;
+    max-height: 80%;
+    display: flex;
+    align-items: flex-end;
+  }
+  
+  .character-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+  
+  .dialogue-box {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    z-index: 10;
+    pointer-events: auto;
+  }
+  
+  .speaker-name {
+    font-weight: bold;
+    color: #3498db;
+    margin-bottom: 10px;
+    font-size: 16px;
+  }
+  
+  .dialogue-text {
+    line-height: 1.6;
+    font-size: 18px;
+    margin-bottom: 15px;
+  }
+  
+  .choices {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 15px;
+  }
+  
+  .choice-button {
+    padding: 10px 15px;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    text-align: left;
+  }
+  
+  .choice-button:hover {
+    background: #2980b9;
+  }
+  
+  /* 진행 인디케이터 스타일 */
+  .advance-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    margin-top: 15px;
+    opacity: 0.7;
+    font-size: 14px;
+    color: #bbb;
+  }
+  
+  .advance-text {
+    margin-right: 8px;
+  }
+  
+  .advance-icon {
+    animation: bounce 2s infinite;
+    font-size: 16px;
+  }
+  
+  @keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+      transform: translateY(0);
+    }
+    40% {
+      transform: translateY(-5px);
+    }
+    60% {
+      transform: translateY(-3px);
+    }
+  }
+  
+  /* 모바일 대응 개선 */
+  @media (max-width: 768px) {
+    .dialogue-text {
+      font-size: 16px;
+    }
+    
+    .advance-indicator {
+      font-size: 12px;
+    }
+    
+    .advance-text {
+      display: none; /* 모바일에서는 텍스트 숨김 */
+    }
+    
+    .menu-buttons button {
+      padding: 8px 16px;
+      font-size: 14px;
+    }
+  }
+  
+  /* 터치 디바이스를 위한 개선 */
+  @media (hover: none) and (pointer: coarse) {
+    .game-container {
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    .choice-button {
+      padding: 15px;
+      font-size: 18px;
+      margin-bottom: 12px;
+    }
+    
+    .choice-button:active {
+      background: #2980b9;
+      transform: scale(0.98);
+    }
+  }
+</style>

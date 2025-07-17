@@ -3,12 +3,14 @@
   import { getSaveSlots, loadGame, type SaveData } from './saveLoad';
   import { resetGame, startGame } from './gameState';
   import Options from './Options.svelte';
+  import SettingsMenu from './SettingsMenu.svelte';
   import '../styles/components/MainMenu.css';
   
   const dispatch = createEventDispatcher();
   
   let showLoadSlots = false;
   let showOptions = false;
+  let showSettings = false;
   let saveSlots: SaveData[] = [];
   
   function handleStart() {
@@ -22,6 +24,10 @@
   
   function handleOptions() {
     showOptions = true;
+  }
+  
+  function handleSettings() {
+    showSettings = true;
   }
   
   function handleExit() {
@@ -71,6 +77,7 @@
     <div class="menu-buttons">
       <button class="menu-button" on:click={handleStart}>시작</button>
       <button class="menu-button" on:click={handleLoad}>불러오기</button>
+      <button class="menu-button" on:click={handleSettings}>설정</button>
       <button class="menu-button" on:click={handleOptions}>옵션</button>
       <button class="menu-button" on:click={handleExit}>종료</button>
     </div>
@@ -101,6 +108,11 @@
         <button class="close-button" on:click={closeLoadSlots}>닫기</button>
       </div>
     </div>
+  {/if}
+  
+  <!-- 설정 팝업 -->
+  {#if showSettings}
+    <SettingsMenu on:close={() => showSettings = false} />
   {/if}
   
   <!-- 옵션 팝업 -->
